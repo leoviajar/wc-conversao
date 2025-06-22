@@ -4,14 +4,19 @@ Este plugin personalizado para WordPress + WooCommerce permite acompanhar e anal
 
 ## 📊 Funcionalidades
 
-- Criação de um menu no admin com a página “Conversão”
+- **Dashboard Widget:** Visualize um resumo das estatísticas de conversão do dia diretamente no painel principal do WordPress.
 
-- Contagem diária de:
-  - Carrinhos iniciados
-  - Checkouts iniciados
-  - Pedidos concluídos
-  
-- Filtro por data para visualizar estatísticas específicas
+- **Página de Análise Detalhada:** Acesse um menu dedicado no admin com a página “Conversão” para:
+  - Filtrar e visualizar estatísticas por data.
+  - Acompanhar a contagem diária de:
+    - **Visitantes Únicos de Páginas de Produto** (contagem robusta contra cache e múltiplas abas/janelas anônimas).
+    - **Carrinhos Iniciados** (contagem única por sessão/dia).
+    - **Checkouts Iniciados** (contagem única por sessão/dia).
+    - Pedidos Concluídos.
+  - Calcular e exibir as seguintes taxas de conversão:
+    - **Taxa de Conversão do Site** (Pedidos Concluídos / Visitantes Únicos de Produto).
+    - Taxa de Conversão de Carrinho (Pedidos Concluídos / Carrinhos Iniciados).
+    - Taxa de Conversão de Checkout (Pedidos Concluídos / Checkouts Iniciados).
 
 ## 🚀 Como Funciona
 

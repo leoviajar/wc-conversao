@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Taxa de Conversão
  * Description: Análises de taxa de conversão para seu e-commerce!
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: Leonardo
  */
 
@@ -342,3 +342,405 @@ function wc_conversao_register_product_visitor_ajax() {
 add_action( 'wp_ajax_wc_conversao_register_product_visitor', 'wc_conversao_register_product_visitor_ajax' );
 // Hook para usuários não logados
 add_action( 'wp_ajax_nopriv_wc_conversao_register_product_visitor', 'wc_conversao_register_product_visitor_ajax' );
+
+
+/**
+ * Busca os produtos mais vendidos.
+ *
+ * @param int $limit O número máximo de produtos a retornar.
+ * @return array Uma lista de objetos de produto WC_Product.
+ */
+function wc_conversao_get_top_selling_products($limit = 10) {
+    $args = array(
+        'post_type' => 'product',
+        'meta_key' => 'total_sales',
+        'orderby' => 'meta_value_num',
+        'order' => 'DESC',
+        'posts_per_page' => $limit,
+    );
+    $products = wc_get_products($args);
+    return $products;
+}
+
+/**
+ * Adiciona o widget de Top 10 Produtos Mais Vendidos ao Dashboard do WordPress.
+ */
+function wc_conversao_add_top_selling_products_widget() {
+    wp_add_dashboard_widget(
+        'wc_conversao_top_selling_products_widget',
+        'Top 10 Produtos Mais Vendidos',
+        'wc_conversao_top_selling_products_widget_content'
+    );
+}
+add_action('wp_dashboard_setup', 'wc_conversao_add_top_selling_products_widget');
+
+/**
+ * Renderiza o conteúdo do widget de Top 10 Produtos Mais Vendidos no Dashboard.
+ */
+function wc_conversao_top_selling_products_widget_content() {
+    $products = wc_conversao_get_top_selling_products();
+
+    if (empty($products)) {
+        echo '<p>Nenhum produto mais vendido encontrado.</p>';
+        return;
+    }
+
+    echo '<div class="wc-conversao-dashboard-widget">';
+    echo '<ol>';
+    foreach ($products as $product) {
+        echo '<li>' . esc_html($product->get_name()) . ' (' . esc_html($product->get_total_sales()) . ' vendas)</li>';
+    }
+    echo '</ol>';
+    echo '</div>';
+}
+
+
+
+
+/**
+ * Busca as principais localizações (país, estado, cidade) dos pedidos.
+ *
+ * @param int $limit O número máximo de localizações a retornar.
+ * @return array Um array associativo com as localizações e suas contagens.
+ */
+function wc_conversao_get_top_locations($limit = 10) {
+    $locations = [];
+    $first_day_of_month = date('Y-m-01 00:00:00');
+    $last_day_of_month = date('Y-m-t 23:59:59');
+
+    $args = [
+        'limit' => -1,
+        'status' => ['wc-completed', 'wc-processing', 'wc-on-hold'],
+        'return' => 'ids',
+        'date_created' => $first_day_of_month . '...' . $last_day_of_month,
+    ];
+
+    $query = new WC_Order_Query($args);
+    $order_ids = $query->get_orders();
+
+    foreach ($order_ids as $order_id) {
+        $order = wc_get_order($order_id);
+        if ($order) {
+            $country = $order->get_billing_country();
+            $state = $order->get_billing_state();
+            $city = $order->get_billing_city();
+
+            if (!empty($country) && !empty($state)) {
+                $location_key = implode(", ", [$state, $country]);
+                if (!isset($locations[$location_key])) {
+                    $locations[$location_key] = 0;
+                }
+                $locations[$location_key]++;
+            }
+        }
+    }
+
+    arsort($locations);
+    return array_slice($locations, 0, $limit, true);
+}
+
+/**
+ * Adiciona o widget de Principais Localizações ao Dashboard do WordPress.
+ */
+function wc_conversao_add_top_locations_widget() {
+    wp_add_dashboard_widget(
+        'wc_conversao_top_locations_widget',
+        'Principais Localizações de Pedidos',
+        'wc_conversao_top_locations_widget_content'
+    );
+}
+add_action('wp_dashboard_setup', 'wc_conversao_add_top_locations_widget');
+
+/**
+ * Renderiza o conteúdo do widget de Principais Localizações no Dashboard.
+ */
+function wc_conversao_top_locations_widget_content() {
+    $locations = wc_conversao_get_top_locations();
+
+    if (empty($locations)) {
+        echo '<p>Nenhuma localização de pedido encontrada.</p>';
+        return;
+    }
+
+    echo '<div class="wc-conversao-dashboard-widget">';
+    echo '<ol>';
+    foreach ($locations as $location => $count) {
+        echo '<li>' . esc_html($location) . ' (' . esc_html($count) . ' pedidos)</li>';
+    }
+    echo '</ol>';
+    echo '</div>';
+}
+
+
+
+
+/**
+ * Registra a visualização de um produto.
+ *
+ * @param int $product_id O ID do produto visualizado.
+ */
+function wc_conversao_track_product_views($product_id) {
+    if (is_singular("product")) {
+        $views = (int) get_post_meta($product_id, "_wc_conversao_product_views_count", true);
+        $views++;
+        update_post_meta($product_id, "_wc_conversao_product_views_count", $views);
+    }
+}
+add_action("template_redirect", function() {
+    if (is_singular("product")) {
+        global $post;
+        wc_conversao_track_product_views($post->ID);
+    }
+});
+
+/**
+ * Busca os produtos mais visitados.
+ *
+ * @param int $limit O número máximo de produtos a retornar.
+ * @return array Uma lista de objetos de produto WC_Product.
+ */
+function wc_conversao_get_most_viewed_products($limit = 10) {
+    $args = array(
+        "post_type" => "product",
+        "meta_key" => "_wc_conversao_product_views_count",
+        "orderby" => "meta_value_num",
+        "order" => "DESC",
+        "posts_per_page" => $limit,
+        "meta_query" => array(
+            array(
+                "key" => "_wc_conversao_product_views_count",
+                "value" => "0",
+                "compare" => ">=",
+                "type" => "NUMERIC"
+            )
+        )
+    );
+    $products = new WP_Query($args);
+    return $products->posts;
+}
+
+/**
+ * Adiciona o widget de Principais Produtos Visitados ao Dashboard do WordPress.
+ */
+function wc_conversao_add_most_viewed_products_widget() {
+    wp_add_dashboard_widget(
+        "wc_conversao_most_viewed_products_widget",
+        "Principais Produtos Visitados",
+        "wc_conversao_most_viewed_products_widget_content"
+    );
+}
+add_action("wp_dashboard_setup", "wc_conversao_add_most_viewed_products_widget");
+
+/**
+ * Renderiza o conteúdo do widget de Principais Produtos Visitados no Dashboard.
+ */
+function wc_conversao_most_viewed_products_widget_content() {
+    $products = wc_conversao_get_most_viewed_products();
+
+    if (empty($products)) {
+        echo "<p>Nenhum produto visitado encontrado.</p>";
+        return;
+    }
+
+    echo "<div class=\"wc-conversao-dashboard-widget\">";
+    echo "<ol>";
+    foreach ($products as $product) {
+        $product_obj = wc_get_product($product->ID);
+        $views = (int) get_post_meta($product->ID, "_wc_conversao_product_views_count", true);
+        echo "<li>" . esc_html($product_obj->get_name()) . " (" . esc_html($views) . " visualizações)</li>";
+    }
+    echo "</ol>";
+    echo "</div>";
+}
+
+
+
+
+/*
+ * FUNÇÕES PARA RASTREAMENTO DE LOCALIZAÇÃO POR IP
+ */
+
+/**
+ * Obtém a localização do usuário baseada no IP.
+ *
+ * @param string $ip O endereço IP do usuário.
+ * @return array|false Array com dados de localização ou false em caso de erro.
+ */
+function wc_conversao_get_location_by_ip($ip) {
+    // Verifica se é um IP válido
+    if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+        return false;
+    }
+
+    // Cache da localização por 24 horas
+    $cache_key = 'wc_conversao_location_' . md5($ip);
+    $cached_location = get_transient($cache_key);
+    
+    if ($cached_location !== false) {
+        return $cached_location;
+    }
+
+    // Faz a requisição para a API de geolocalização
+    $response = wp_remote_get("http://ip-api.com/json/{$ip}?fields=status,country,regionName,city", array(
+        'timeout' => 10,
+        'user-agent' => 'WordPress/' . get_bloginfo('version') . '; ' . home_url()
+    ));
+
+    if (is_wp_error($response)) {
+        return false;
+    }
+
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+
+    if (!$data || $data['status'] !== 'success') {
+        return false;
+    }
+
+    $location_data = array(
+        'country' => $data['country'],
+        'state' => $data['regionName'],
+        'city' => $data['city']
+    );
+
+    // Cache por 24 horas
+    set_transient($cache_key, $location_data, 24 * HOUR_IN_SECONDS);
+
+    return $location_data;
+}
+
+/**
+ * Obtém o IP real do usuário considerando proxies e CDNs.
+ *
+ * @return string O endereço IP do usuário.
+ */
+function wc_conversao_get_user_ip() {
+    $ip_keys = array(
+        'HTTP_CF_CONNECTING_IP',     // Cloudflare
+        'HTTP_CLIENT_IP',            // Proxy
+        'HTTP_X_FORWARDED_FOR',      // Load Balancer/Proxy
+        'HTTP_X_FORWARDED',          // Proxy
+        'HTTP_X_CLUSTER_CLIENT_IP',  // Cluster
+        'HTTP_FORWARDED_FOR',        // Proxy
+        'HTTP_FORWARDED',            // Proxy
+        'REMOTE_ADDR'                // Standard
+    );
+
+    foreach ($ip_keys as $key) {
+        if (array_key_exists($key, $_SERVER) === true) {
+            $ip = $_SERVER[$key];
+            if (strpos($ip, ',') !== false) {
+                $ip = explode(',', $ip)[0];
+            }
+            $ip = trim($ip);
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false) {
+                return $ip;
+            }
+        }
+    }
+
+    return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+}
+
+/**
+ * Registra a visita de um local baseado no IP do usuário.
+ */
+function wc_conversao_track_location_visit() {
+    // Só executa no frontend
+    if (is_admin()) {
+        return;
+    }
+
+    $user_ip = wc_conversao_get_user_ip();
+    $location = wc_conversao_get_location_by_ip($user_ip);
+
+    if (!$location) {
+        return;
+    }
+
+    $today = current_time('Y-m-d');
+    $location_key = $location['state'] . ', ' . $location['country'];
+    
+    // Verifica se já foi contado hoje para este IP
+    $counted_ips_option = 'wc_conversao_location_ips_' . $today;
+    $counted_ips = get_option($counted_ips_option, array());
+    
+    if (in_array($user_ip, $counted_ips)) {
+        return;
+    }
+
+    // Adiciona o IP à lista de IPs contados
+    $counted_ips[] = $user_ip;
+    update_option($counted_ips_option, $counted_ips);
+
+    // Atualiza a contagem de visitas por localização
+    $locations_option = 'wc_conversao_locations_' . $today;
+    $locations_data = get_option($locations_option, array());
+    
+    if (!isset($locations_data[$location_key])) {
+        $locations_data[$location_key] = 0;
+    }
+    
+    $locations_data[$location_key]++;
+    update_option($locations_option, $locations_data);
+}
+add_action('wp', 'wc_conversao_track_location_visit');
+
+/**
+ * Busca as principais localizações visitadas.
+ *
+ * @param int $limit O número máximo de localizações a retornar.
+ * @param string $date A data para buscar (formato Y-m-d). Se não informada, usa hoje.
+ * @return array Um array associativo com as localizações e suas contagens.
+ */
+function wc_conversao_get_top_visited_locations($limit = 10, $date = null) {
+    if (!$date) {
+        $date = current_time('Y-m-d');
+    }
+
+    $locations_option = 'wc_conversao_locations_' . $date;
+    $locations_data = get_option($locations_option, array());
+
+    if (empty($locations_data)) {
+        return array();
+    }
+
+    // Ordena por número de visitas (decrescente)
+    arsort($locations_data);
+
+    // Retorna apenas o número limitado de resultados
+    return array_slice($locations_data, 0, $limit, true);
+}
+
+/**
+ * Adiciona o widget de Principais Locais Visitados ao Dashboard do WordPress.
+ */
+function wc_conversao_add_top_visited_locations_widget() {
+    wp_add_dashboard_widget(
+        'wc_conversao_top_visited_locations_widget',
+        'Principais Locais Visitados (Hoje)',
+        'wc_conversao_top_visited_locations_widget_content'
+    );
+}
+add_action('wp_dashboard_setup', 'wc_conversao_add_top_visited_locations_widget');
+
+/**
+ * Renderiza o conteúdo do widget de Principais Locais Visitados no Dashboard.
+ */
+function wc_conversao_top_visited_locations_widget_content() {
+    $locations = wc_conversao_get_top_visited_locations();
+
+    if (empty($locations)) {
+        echo '<p>Nenhuma localização visitada encontrada para hoje.</p>';
+        return;
+    }
+
+    echo '<div class="wc-conversao-dashboard-widget">';
+    echo '<ol>';
+    foreach ($locations as $location => $count) {
+        echo '<li>' . esc_html($location) . ' (' . esc_html($count) . ' visitas)</li>';
+    }
+    echo '</ol>';
+    echo '</div>';
+}
+

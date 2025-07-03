@@ -17,6 +17,12 @@ Este plugin personalizado para WordPress + WooCommerce permite acompanhar e anal
     - **Taxa de Conversão do Site** (Pedidos Concluídos / Visitantes Únicos de Produto).
     - Taxa de Conversão de Carrinho (Pedidos Concluídos / Carrinhos Iniciados).
     - Taxa de Conversão de Checkout (Pedidos Concluídos / Checkouts Iniciados).
+  - Widgets no painel admin:
+    - Análises de conversão (Hoje)
+    - Principais locais visitados (Hoje)
+    - Principais produtos visitados
+    - Top 10 produtos mais vendidos
+    - Principais localizações de pedidos
 
 ## 🚀 Como Funciona
 
